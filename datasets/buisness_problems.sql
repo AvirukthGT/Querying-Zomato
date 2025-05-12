@@ -99,6 +99,49 @@ where extract(year from o.order_date)=2023
 group by 1,2
 order by 1,3 desc
 
+-- Most Popular Dish by City
+with cte as (
+select r.city,o.order_item,count(o.order_id),
+dense_rank() over(partition by r.city order by count(o.order_id) desc) as rank
+from  orders o join resturant r  using(restaurant_id)
+group by 1,2
+order by 1,3 desc
+) select * from cte where rank=1
+
+-- Customer Churn
+-- Find customers who haven’t placed an order in 2024 but did in 2023.
+
+with t2023 as (
+select c.customer_id,c.customer_name
+from customer c join orders o using(customer_id)
+where extract(year from o.order_date)=2023
+), t2024 as 
+(select c.customer_id,c.customer_name
+from customer c join orders o using(customer_id)
+where extract(year from o.order_date)=2024)
+select distinct customer_id, customer_name from t2023 where customer_id not in (select customer_id from t2024)
+
+
+--alternate method
+select * from (
+select c.customer_id,c.customer_name,extract(year from max(order_date)) as last_order
+from customer c join orders o using(customer_id) 
+group by 1,2
+) as t where last_order=2023
+
+-- Calculating and comparing the order cancellation rate for each restaurant between the current year
+-- and the previous year.
+with t2023 as (
+select o.restaurant_id,r.restaurant_name,count(o.order_id) as total_orders_2023,COunt(case when d.delivery_id is null then 1 end) as not_delivered_2023 from orders o left join resturant r  using(restaurant_id) left join delivery d using(order_id)
+where extract(year from o.order_date)=2023
+group by 1,2
+), t2024 as (
+	select o.restaurant_id,r.restaurant_name,count(o.order_id) as total_orders_2024,COunt(case when d.delivery_id is null then 1 end) as not_delivered_2024 from orders o left join resturant r  using(restaurant_id) left join delivery d using(order_id)
+where extract(year from o.order_date)=2024
+group by 1,2
+) select t2023.restaurant_id,t2023.restaurant_name,round(not_delivered_2023::numeric/total_orders_2023*100,2) as cancellation_rate_2023,
+	round(not_delivered_2024::numeric/total_orders_2024*100,2) as cancellation_rate_2024
+from t2023   full outer join t2024  using(restaurant_id,restaurant_name) order by not_delivered_2023 desc
 
 
 
