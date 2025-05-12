@@ -1,56 +1,74 @@
---Zomato sales
---schema
-drop table if exists customer;
-create table customer(
-	customer_id int primary key,	
-	customer_name varchar(30),	
-	reg_date date
+-- -----------------------------------------
+-- ZOMATO SALES DATABASE SCHEMA
+-- -----------------------------------------
 
+-- Drop existing tables if they exist to start fresh
+DROP TABLE IF EXISTS delivery;
+DROP TABLE IF EXISTS rider;
+DROP TABLE IF EXISTS orders;
+DROP TABLE IF EXISTS resturant;
+DROP TABLE IF EXISTS customer;
+
+-- -----------------------------------------
+-- CUSTOMER TABLE
+-- Stores customer details
+-- -----------------------------------------
+CREATE TABLE customer (
+    customer_id INT PRIMARY KEY,            -- Unique customer ID
+    customer_name VARCHAR(30),               -- Name of the customer
+    reg_date DATE                            -- Registration date
 );
 
-drop table if exists resturant;
-create table resturant(
-	restaurant_id int primary key,	
-	restaurant_name varchar(55),
-	city varchar(15),
-	opening_hours varchar(55)
-
+-- -----------------------------------------
+-- RESTAURANT TABLE
+-- Stores restaurant details
+-- -----------------------------------------
+CREATE TABLE resturant (
+    restaurant_id INT PRIMARY KEY,           -- Unique restaurant ID
+    restaurant_name VARCHAR(55),              -- Name of the restaurant
+    city VARCHAR(15),                         -- City where the restaurant is located
+    opening_hours VARCHAR(55)                 -- Opening hours (text format)
 );
 
-drop table if exists orders;
-create table orders(
-	order_id	int primary key,
-	customer_id	 int,
-	restaurant_id	int,
-	order_item	varchar(30),
-	order_date	date,
-	order_time	time,
-	order_status varchar(25),	
-	total_amount float
-	
-
-);
-alter table orders add constraint fk_customers_order foreign key (customer_id) references customer(customer_id);
-alter table orders add constraint fk_resturant_order foreign key (restaurant_id) references resturant(restaurant_id);
-
-
-
-drop table if exists rider;
-create table rider(
-	rider_id int primary key,	
-	rider_name varchar(55),	
-	sign_up date
-
+-- -----------------------------------------
+-- ORDERS TABLE
+-- Stores orders placed by customers
+-- -----------------------------------------
+CREATE TABLE orders (
+    order_id INT PRIMARY KEY,                 -- Unique order ID
+    customer_id INT,                          -- Customer who placed the order
+    restaurant_id INT,                        -- Restaurant from where the order is placed
+    order_item VARCHAR(30),                   -- Item ordered
+    order_date DATE,                          -- Date of the order
+    order_time TIME,                          -- Time of the order
+    order_status VARCHAR(25),                 -- Status (e.g., Delivered, Cancelled)
+    total_amount FLOAT,                       -- Total order amount
+    -- Foreign keys
+    CONSTRAINT fk_customers_order FOREIGN KEY (customer_id) REFERENCES customer(customer_id),
+    CONSTRAINT fk_resturant_order FOREIGN KEY (restaurant_id) REFERENCES resturant(restaurant_id)
 );
 
-drop table if exists delivery;
-create table delivery(
-	delivery_id int primary key,	
-	order_id int,	
-	delivery_status varchar(35),	
-	delivery_time time,	
-	rider_id int,
-	constraint fk_order_delivery foreign key(order_id) references orders(order_id),
-	constraint fk_rider_delivery foreign key(rider_id) references rider(rider_id)
+-- -----------------------------------------
+-- RIDER TABLE
+-- Stores delivery rider details
+-- -----------------------------------------
+CREATE TABLE rider (
+    rider_id INT PRIMARY KEY,                 -- Unique rider ID
+    rider_name VARCHAR(55),                   -- Name of the rider
+    sign_up DATE                               -- Date when the rider signed up
+);
 
+-- -----------------------------------------
+-- DELIVERY TABLE
+-- Stores delivery details
+-- -----------------------------------------
+CREATE TABLE delivery (
+    delivery_id INT PRIMARY KEY,              -- Unique delivery ID
+    order_id INT,                             -- Associated order
+    delivery_status VARCHAR(35),              -- Status of delivery (e.g., On the way, Delivered)
+    delivery_time TIME,                       -- Time of delivery
+    rider_id INT,                             -- Rider who delivered the order
+    -- Foreign keys
+    CONSTRAINT fk_order_delivery FOREIGN KEY (order_id) REFERENCES orders(order_id),
+    CONSTRAINT fk_rider_delivery FOREIGN KEY (rider_id) REFERENCES rider(rider_id)
 );
