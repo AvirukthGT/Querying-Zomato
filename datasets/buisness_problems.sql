@@ -253,8 +253,12 @@ order by 1,2
 ) select *,round((current_month-previous_month)::numeric/previous_month::numeric*100,2) as growth_rate_percentage from cte
 
 
--- Q18. Rider Efficiency
+-- Rider Efficiency
 
--- Question:
 -- Evaluate rider efficiency by determining average delivery times and identifying those with the
 -- lowest and highest averages.
+with cte as (
+select *, round(extract(epoch from (d.delivery_time-o.order_time + case when d.delivery_time < o.order_time then interval '1 day' else interval '0 day' end))/60,2) as time_minutes from orders o join delivery d using(order_id) join rider r using (rider_id)
+where d.delivery_status ilike 'delivered'
+) , rider_time as (select rider_id,rider_name,avg(time_minutes) from cte group by 1,2 order by 1)
+select min(avg),max(avg) from rider_time
