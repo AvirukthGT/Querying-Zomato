@@ -144,6 +144,90 @@ group by 1,2
 from t2023   full outer join t2024  using(restaurant_id,restaurant_name) order by not_delivered_2023 desc
 
 
+ -- Rider Average Delivery Time
+
+ select r.rider_id,r.rider_name,
+ avg(round(extract(epoch from (d.delivery_time-o.order_time + case when d.delivery_time < o.order_time then interval '1 days' else interval '0 days' end))/60,2)) as avg_time_minues
+ 	
+ 
+ from rider r join delivery d using(rider_id) join orders o using(order_id)
+ where d.delivery_status ilike 'delivered'
+ group by 1,2;
+
+-- Monthly Restaurant Growth Ratio
+-- Calculate each restaurant's growth ratio based on the total number of delivered orders since its
+-- joining.
+with cte as 
+(select 
+	r.restaurant_id,
+	r.restaurant_name,
+	to_char(o.order_date,'mm-yy') as month,
+	count(o.order_id) as current_month_count,
+	lag(count(o.order_id),1) over(partition by r.restaurant_id) as prev_month_count
+
+from resturant r join orders o using (restaurant_id) join delivery d using(order_id)
+where d.delivery_status ilike 'delivered'         
+group by 1,2,3
+order by 1,3
+) select *, round((current_month_count::numeric-prev_month_count::numeric)/prev_month_count::numeric,2) as growth_ratio from cte
 
 
+-- Customer Segmentation
+-- Segmentation of  customers into 'Gold' or 'Silver' groups based on their total spending compared to the
+-- average order value (AOV). If a customer's total spending exceeds the AOV, labelling them as
+-- 'Gold'; otherwise, labelling them as 'Silver'.
+-- Return: The total number of orders and total revenue for each segment.
 
+with cte as (
+select 
+	customer_id,
+	sum(total_amount) as total_spent ,
+	count(order_id) as order_count ,
+	case 
+		when sum(total_amount) > (select avg(total_amount) from orders )then 'Gold' 
+		else 'Silver'
+	end as customer_category
+from orders 
+group by 1
+) select customer_category,sum(order_count) as total_orders, sum(total_spent) as total_revenue from cte
+group by 1
+
+--  Rider Monthly Earnings
+
+-- Calculating each rider's total monthly earnings, assuming they earn 8% of the order amount.
+
+select r.rider_id,r.rider_name,to_char(o.order_date,'mm-yy') as month,round(sum(o.total_amount*0.08)::numeric,2) as total_earnings from orders o join delivery d using(order_id) join rider r using(rider_id)
+group by 1,2,3
+order by 1,3
+
+
+-- Finding the number of 5-star, 4-star, and 3-star ratings each rider has.
+-- Riders receive ratings based on delivery time:
+-- ● 5-star: Delivered in less than 25 minutes
+-- ● 4-star: Delivered between 25 and 40 minutes
+-- ● 3-star: Delivered after 40 minutes
+
+select rider_id,rider_rating,count(*) from (
+with cte as ( 
+select o.order_id,r.rider_id,r.rider_name,
+  round(extract(epoch from (d.delivery_time-o.order_time + case when d.delivery_time < o.order_time then interval '1 day' else interval '0 day' end))/60,2) as time_minutes
+  from rider r join delivery d using(rider_id) join orders o using(order_id)
+ where d.delivery_status ilike 'delivered'
+)
+select *, case
+	when time_minutes <25 then '5 Star'
+	when time_minutes between 25 and 40 then '4 Star'
+	else '3 Star' end as rider_rating 
+	from cte
+) as t group by 1,2
+order by 1,2
+
+-- Order Frequency by Day
+-- Analyzing order frequency per day of the week and identify the peak day for each restaurant.
+with cte as(
+select r.restaurant_name,to_char(o.order_date,'Day') as day,count(o.order_id),
+dense_rank() over(partition by r.restaurant_name order by count(o.order_id) desc ) as rank
+from orders o join resturant r using (restaurant_id)
+group by 1,2
+order by 1,3 
+) select restaurant_name,day,count as total_orders from cte where rank=1;
