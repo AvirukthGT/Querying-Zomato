@@ -241,3 +241,20 @@ select c.customer_id,c.customer_name,sum(o.total_amount) as CLV
 from orders o join customer c using(customer_id)
 group by 1,2 
 order by 1
+
+-- Q17. Monthly Sales Trends
+-- Question:
+-- Identify sales trends by comparing each month's total sales to the previous month.
+
+with cte as (
+select extract(year from order_date) as year ,extract(month from order_date) as month,sum(total_amount) as current_month,lag(sum(total_amount),1) over(order by extract(year from order_date),extract(month from order_date) ) as previous_month from orders
+group by 1,2
+order by 1,2
+) select *,round((current_month-previous_month)::numeric/previous_month::numeric*100,2) as growth_rate_percentage from cte
+
+
+-- Q18. Rider Efficiency
+
+-- Question:
+-- Evaluate rider efficiency by determining average delivery times and identifying those with the
+-- lowest and highest averages.
