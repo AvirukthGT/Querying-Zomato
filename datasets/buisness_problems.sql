@@ -1,264 +1,432 @@
---Data analysis
+-- ======================================
+-- View Tables and Check for Missing Data
+-- ======================================
 
-select * from customer;
-select * from resturant;
-select * from orders;
-select * from rider;
-select * from delivery;
+SELECT * FROM customer;
+SELECT * FROM resturant;
+SELECT * FROM orders;
+SELECT * FROM rider;
+SELECT * FROM delivery;
 
+-- Count total rows and check for NULLs
+SELECT count(*) FROM customer;
+SELECT * FROM customer
+WHERE customer_id IS NULL OR customer_name IS NULL OR reg_date IS NULL;
 
-select count(*) from customer;
-select * from customer
-where customer_id is null or customer_name is null or reg_date is null;
+SELECT count(*) FROM resturant;
+SELECT * FROM resturant
+WHERE restaurant_id IS NULL OR restaurant_name IS NULL OR city IS NULL OR opening_hours IS NULL;
 
-select count(*) from resturant;
-select * from resturant
-where restaurant_id is null or restaurant_name is null or city is null or opening_hours is null;
+SELECT count(*) FROM orders;
+SELECT * FROM orders
+WHERE order_id IS NULL OR order_item IS NULL OR order_date IS NULL OR order_time IS NULL OR order_status IS NULL OR total_amount IS NULL;
 
-select count(*) from orders;
-select * from orders
-where order_id is null or order_item is null or order_date is null or order_time is null or order_status is null or total_amount is null;
+SELECT count(*) FROM rider;
+SELECT count(*) FROM delivery;
 
-select count(*) from rider;
-select count(*) from delivery;
-
-
---Top 5 Most Frequently Ordered Dishes by the customer "Arjun Mehta" in 2023
-
-select c.customer_name,order_item,count(*) as total_orders from customer c join orders o using (customer_id)
-where c.customer_name ilike 'Arjun Mehta' and extract(year from o.order_date)=2023
-group by 1,2
-order by 3 desc
-limit 5;
-
-
---Popular Time Slots
---Identify the time slots with the most order placements, based on 2-hour intervals.
-select 
-	case 
-		when extract(hour from order_time) between 0 and 1 then '12AM-2AM'
-		when extract(hour from order_time) between 2 and 3 then '2AM-4AM'
-		when extract(hour from order_time) between 4 and 5 then '4AM-6AM'
-		when extract(hour from order_time) between 6 and 7 then '6AM-8AM'
-		when extract(hour from order_time) between 8 and 9 then '8AM-10AM'
-		when extract(hour from order_time) between 10 and 11 then '10AM-12PM'
-		when extract(hour from order_time) between 12 and 13 then '12PM-2PM'
-		when extract(hour from order_time) between 14 and 15 then '2PM-4PM'
-		when extract(hour from order_time) between 16 and 17 then '4PM-6PM'
-		when extract(hour from order_time) between 18 and 19 then '6PM-8PM'
-		when extract(hour from order_time) between 20 and 21 then '8PM-10PM'
-		when extract(hour from order_time) between 22 and 23 then '10MM-12PM'
-	 end as time_slot,
-	 count(order_id) as order_count
-	
-from orders
-group by time_slot
-order by 2 desc;
-
---Alternate approach since the prev query takes too much time
+-- ======================================
+-- 1. Top 5 Most Frequently Ordered Dishes by "Arjun Mehta" in 2023
+-- ======================================
 
 SELECT 
-	FLOOR(EXTRACT(HOUR FROM order_time)/2)*2 as start_time,
-	FLOOR(EXTRACT(HOUR FROM order_time)/2)*2 + 2 as end_time,
-	COUNT(*) as total_orders
-FROM orders
+    c.customer_name,
+    o.order_item,
+    COUNT(*) AS total_orders
+FROM customer c
+JOIN orders o USING (customer_id)
+WHERE c.customer_name ILIKE 'Arjun Mehta'
+  AND EXTRACT(YEAR FROM o.order_date) = 2023
 GROUP BY 1, 2
 ORDER BY 3 DESC
+LIMIT 5;
 
+-- ======================================
+-- 2. Popular Time Slots (2-hour intervals)
+-- ======================================
 
---Order Value Analysis
---Find the average order value (AOV) per customer who has placed more than 750 orders.
+-- Approach 1: CASE statement for specific slots
+SELECT 
+    CASE 
+        WHEN EXTRACT(HOUR FROM order_time) BETWEEN 0 AND 1 THEN '12AM-2AM'
+        WHEN EXTRACT(HOUR FROM order_time) BETWEEN 2 AND 3 THEN '2AM-4AM'
+        WHEN EXTRACT(HOUR FROM order_time) BETWEEN 4 AND 5 THEN '4AM-6AM'
+        WHEN EXTRACT(HOUR FROM order_time) BETWEEN 6 AND 7 THEN '6AM-8AM'
+        WHEN EXTRACT(HOUR FROM order_time) BETWEEN 8 AND 9 THEN '8AM-10AM'
+        WHEN EXTRACT(HOUR FROM order_time) BETWEEN 10 AND 11 THEN '10AM-12PM'
+        WHEN EXTRACT(HOUR FROM order_time) BETWEEN 12 AND 13 THEN '12PM-2PM'
+        WHEN EXTRACT(HOUR FROM order_time) BETWEEN 14 AND 15 THEN '2PM-4PM'
+        WHEN EXTRACT(HOUR FROM order_time) BETWEEN 16 AND 17 THEN '4PM-6PM'
+        WHEN EXTRACT(HOUR FROM order_time) BETWEEN 18 AND 19 THEN '6PM-8PM'
+        WHEN EXTRACT(HOUR FROM order_time) BETWEEN 20 AND 21 THEN '8PM-10PM'
+        WHEN EXTRACT(HOUR FROM order_time) BETWEEN 22 AND 23 THEN '10PM-12AM'
+    END AS time_slot,
+    COUNT(order_id) AS order_count
+FROM orders
+GROUP BY time_slot
+ORDER BY 2 DESC;
 
-select c.customer_name,round(avg(o.total_amount)::numeric,2) as aov from customer c join orders o using(customer_id)
-group by 1 
-having count(order_id)>750
+-- Alternate faster approach
+SELECT 
+    FLOOR(EXTRACT(HOUR FROM order_time) / 2) * 2 AS start_time,
+    FLOOR(EXTRACT(HOUR FROM order_time) / 2) * 2 + 2 AS end_time,
+    COUNT(*) AS total_orders
+FROM orders
+GROUP BY 1, 2
+ORDER BY 3 DESC;
 
--- High-Value Customers
--- List the customers who have spent more than 100K in total on food orders.
+-- ======================================
+-- 3. Order Value Analysis (Customers with >750 Orders)
+-- ======================================
 
-select c.customer_name,round(sum(o.total_amount)::numeric,2) as total_spent from customer c join orders o using(customer_id)
-group by 1 
-having sum(o.total_amount)>100000
+SELECT 
+    c.customer_name,
+    ROUND(AVG(o.total_amount)::NUMERIC, 2) AS aov
+FROM customer c
+JOIN orders o USING (customer_id)
+GROUP BY 1
+HAVING COUNT(order_id) > 750;
 
---Orders Without Delivery
---find orders that were placed but not delivered.
+-- ======================================
+-- 4. High-Value Customers (Spent > 100K)
+-- ======================================
 
-select r.restaurant_name,count(o.order_id) as num_orders_not_delivered from orders o left  join resturant r  using(restaurant_id)
-where o.order_id not in (select order_id from delivery)
-group by 1
-order by 2 desc
+SELECT 
+    c.customer_name,
+    ROUND(SUM(o.total_amount)::NUMERIC, 2) AS total_spent
+FROM customer c
+JOIN orders o USING (customer_id)
+GROUP BY 1
+HAVING SUM(o.total_amount) > 100000;
 
---Restaurant Revenue Ranking
--- Rank restaurants by their total revenue from the last year.
--- Return: restaurant_name, total_revenue, and their rank within their city.
+-- ======================================
+-- 5. Orders Without Delivery
+-- ======================================
 
-select r.city,r.restaurant_name,sum(o.total_amount) as total_revenue,
-dense_rank() over(partition by r.city order by sum(o.total_amount) desc) as rank
-from orders o join resturant r  using(restaurant_id)
-where extract(year from o.order_date)=2023
-group by 1,2
-order by 1,3 desc
+SELECT 
+    r.restaurant_name,
+    COUNT(o.order_id) AS num_orders_not_delivered
+FROM orders o
+LEFT JOIN resturant r USING (restaurant_id)
+WHERE o.order_id NOT IN (SELECT order_id FROM delivery)
+GROUP BY 1
+ORDER BY 2 DESC;
 
--- Most Popular Dish by City
-with cte as (
-select r.city,o.order_item,count(o.order_id),
-dense_rank() over(partition by r.city order by count(o.order_id) desc) as rank
-from  orders o join resturant r  using(restaurant_id)
-group by 1,2
-order by 1,3 desc
-) select * from cte where rank=1
+-- ======================================
+-- 6. Restaurant Revenue Ranking (by City)
+-- ======================================
 
--- Customer Churn
--- Find customers who haven’t placed an order in 2024 but did in 2023.
+SELECT 
+    r.city,
+    r.restaurant_name,
+    SUM(o.total_amount) AS total_revenue,
+    DENSE_RANK() OVER (PARTITION BY r.city ORDER BY SUM(o.total_amount) DESC) AS rank
+FROM orders o
+JOIN resturant r USING (restaurant_id)
+WHERE EXTRACT(YEAR FROM o.order_date) = 2023
+GROUP BY 1, 2
+ORDER BY 1, 3 DESC;
 
-with t2023 as (
-select c.customer_id,c.customer_name
-from customer c join orders o using(customer_id)
-where extract(year from o.order_date)=2023
-), t2024 as 
-(select c.customer_id,c.customer_name
-from customer c join orders o using(customer_id)
-where extract(year from o.order_date)=2024)
-select distinct customer_id, customer_name from t2023 where customer_id not in (select customer_id from t2024)
+-- ======================================
+-- 7. Most Popular Dish by City
+-- ======================================
 
-
---alternate method
-select * from (
-select c.customer_id,c.customer_name,extract(year from max(order_date)) as last_order
-from customer c join orders o using(customer_id) 
-group by 1,2
-) as t where last_order=2023
-
--- Calculating and comparing the order cancellation rate for each restaurant between the current year
--- and the previous year.
-with t2023 as (
-select o.restaurant_id,r.restaurant_name,count(o.order_id) as total_orders_2023,COunt(case when d.delivery_id is null then 1 end) as not_delivered_2023 from orders o left join resturant r  using(restaurant_id) left join delivery d using(order_id)
-where extract(year from o.order_date)=2023
-group by 1,2
-), t2024 as (
-	select o.restaurant_id,r.restaurant_name,count(o.order_id) as total_orders_2024,COunt(case when d.delivery_id is null then 1 end) as not_delivered_2024 from orders o left join resturant r  using(restaurant_id) left join delivery d using(order_id)
-where extract(year from o.order_date)=2024
-group by 1,2
-) select t2023.restaurant_id,t2023.restaurant_name,round(not_delivered_2023::numeric/total_orders_2023*100,2) as cancellation_rate_2023,
-	round(not_delivered_2024::numeric/total_orders_2024*100,2) as cancellation_rate_2024
-from t2023   full outer join t2024  using(restaurant_id,restaurant_name) order by not_delivered_2023 desc
-
-
- -- Rider Average Delivery Time
-
- select r.rider_id,r.rider_name,
- avg(round(extract(epoch from (d.delivery_time-o.order_time + case when d.delivery_time < o.order_time then interval '1 days' else interval '0 days' end))/60,2)) as avg_time_minues
- 	
- 
- from rider r join delivery d using(rider_id) join orders o using(order_id)
- where d.delivery_status ilike 'delivered'
- group by 1,2;
-
--- Monthly Restaurant Growth Ratio
--- Calculate each restaurant's growth ratio based on the total number of delivered orders since its
--- joining.
-with cte as 
-(select 
-	r.restaurant_id,
-	r.restaurant_name,
-	to_char(o.order_date,'mm-yy') as month,
-	count(o.order_id) as current_month_count,
-	lag(count(o.order_id),1) over(partition by r.restaurant_id) as prev_month_count
-
-from resturant r join orders o using (restaurant_id) join delivery d using(order_id)
-where d.delivery_status ilike 'delivered'         
-group by 1,2,3
-order by 1,3
-) select *, round((current_month_count::numeric-prev_month_count::numeric)/prev_month_count::numeric,2) as growth_ratio from cte
-
-
--- Customer Segmentation
--- Segmentation of  customers into 'Gold' or 'Silver' groups based on their total spending compared to the
--- average order value (AOV). If a customer's total spending exceeds the AOV, labelling them as
--- 'Gold'; otherwise, labelling them as 'Silver'.
--- Return: The total number of orders and total revenue for each segment.
-
-with cte as (
-select 
-	customer_id,
-	sum(total_amount) as total_spent ,
-	count(order_id) as order_count ,
-	case 
-		when sum(total_amount) > (select avg(total_amount) from orders )then 'Gold' 
-		else 'Silver'
-	end as customer_category
-from orders 
-group by 1
-) select customer_category,sum(order_count) as total_orders, sum(total_spent) as total_revenue from cte
-group by 1
-
---  Rider Monthly Earnings
-
--- Calculating each rider's total monthly earnings, assuming they earn 8% of the order amount.
-
-select r.rider_id,r.rider_name,to_char(o.order_date,'mm-yy') as month,round(sum(o.total_amount*0.08)::numeric,2) as total_earnings from orders o join delivery d using(order_id) join rider r using(rider_id)
-group by 1,2,3
-order by 1,3
-
-
--- Finding the number of 5-star, 4-star, and 3-star ratings each rider has.
--- Riders receive ratings based on delivery time:
--- ● 5-star: Delivered in less than 25 minutes
--- ● 4-star: Delivered between 25 and 40 minutes
--- ● 3-star: Delivered after 40 minutes
-
-select rider_id,rider_rating,count(*) from (
-with cte as ( 
-select o.order_id,r.rider_id,r.rider_name,
-  round(extract(epoch from (d.delivery_time-o.order_time + case when d.delivery_time < o.order_time then interval '1 day' else interval '0 day' end))/60,2) as time_minutes
-  from rider r join delivery d using(rider_id) join orders o using(order_id)
- where d.delivery_status ilike 'delivered'
+WITH cte AS (
+    SELECT 
+        r.city,
+        o.order_item,
+        COUNT(o.order_id) AS order_count,
+        DENSE_RANK() OVER (PARTITION BY r.city ORDER BY COUNT(o.order_id) DESC) AS rank
+    FROM orders o
+    JOIN resturant r USING (restaurant_id)
+    GROUP BY 1, 2
 )
-select *, case
-	when time_minutes <25 then '5 Star'
-	when time_minutes between 25 and 40 then '4 Star'
-	else '3 Star' end as rider_rating 
-	from cte
-) as t group by 1,2
-order by 1,2
+SELECT * FROM cte WHERE rank = 1;
 
--- Order Frequency by Day
--- Analyzing order frequency per day of the week and identify the peak day for each restaurant.
-with cte as(
-select r.restaurant_name,to_char(o.order_date,'Day') as day,count(o.order_id),
-dense_rank() over(partition by r.restaurant_name order by count(o.order_id) desc ) as rank
-from orders o join resturant r using (restaurant_id)
-group by 1,2
-order by 1,3 
-) select restaurant_name,day,count as total_orders from cte where rank=1;
+-- ======================================
+-- 8. Customer Churn Analysis
+-- ======================================
+
+-- Method 1: Using CTEs
+WITH t2023 AS (
+    SELECT DISTINCT c.customer_id
+    FROM customer c
+    JOIN orders o USING (customer_id)
+    WHERE EXTRACT(YEAR FROM o.order_date) = 2023
+), t2024 AS (
+    SELECT DISTINCT c.customer_id
+    FROM customer c
+    JOIN orders o USING (customer_id)
+    WHERE EXTRACT(YEAR FROM o.order_date) = 2024
+)
+SELECT t2023.customer_id
+FROM t2023
+WHERE customer_id NOT IN (SELECT customer_id FROM t2024);
+
+-- Method 2: Using last order year
+SELECT *
+FROM (
+    SELECT 
+        c.customer_id,
+        c.customer_name,
+        EXTRACT(YEAR FROM MAX(order_date)) AS last_order_year
+    FROM customer c
+    JOIN orders o USING (customer_id)
+    GROUP BY 1, 2
+) AS t
+WHERE last_order_year = 2023;
+
+-- ======================================
+-- 9. Order Cancellation Rate (Year-on-Year)
+-- ======================================
+
+WITH t2023 AS (
+    SELECT 
+        o.restaurant_id,
+        r.restaurant_name,
+        COUNT(o.order_id) AS total_orders_2023,
+        COUNT(CASE WHEN d.delivery_id IS NULL THEN 1 END) AS not_delivered_2023
+    FROM orders o
+    LEFT JOIN resturant r USING (restaurant_id)
+    LEFT JOIN delivery d USING (order_id)
+    WHERE EXTRACT(YEAR FROM o.order_date) = 2023
+    GROUP BY 1, 2
+), t2024 AS (
+    SELECT 
+        o.restaurant_id,
+        r.restaurant_name,
+        COUNT(o.order_id) AS total_orders_2024,
+        COUNT(CASE WHEN d.delivery_id IS NULL THEN 1 END) AS not_delivered_2024
+    FROM orders o
+    LEFT JOIN resturant r USING (restaurant_id)
+    LEFT JOIN delivery d USING (order_id)
+    WHERE EXTRACT(YEAR FROM o.order_date) = 2024
+    GROUP BY 1, 2
+)
+SELECT 
+    t2023.restaurant_id,
+    t2023.restaurant_name,
+    ROUND(not_delivered_2023::NUMERIC / total_orders_2023 * 100, 2) AS cancellation_rate_2023,
+    ROUND(not_delivered_2024::NUMERIC / total_orders_2024 * 100, 2) AS cancellation_rate_2024
+FROM t2023
+FULL OUTER JOIN t2024 USING (restaurant_id, restaurant_name)
+ORDER BY cancellation_rate_2023 DESC;
+
+-- ======================================
+-- 10. Rider Average Delivery Time
+-- ======================================
+
+SELECT 
+    r.rider_id,
+    r.rider_name,
+    AVG(ROUND(EXTRACT(EPOCH FROM (d.delivery_time - o.order_time + CASE WHEN d.delivery_time < o.order_time THEN INTERVAL '1 day' ELSE INTERVAL '0 day' END)) / 60, 2)) AS avg_time_minutes
+FROM rider r
+JOIN delivery d USING (rider_id)
+JOIN orders o USING (order_id)
+WHERE d.delivery_status ILIKE 'delivered'
+GROUP BY 1, 2;
+
+-- ======================================
+-- 11. Monthly Restaurant Growth Ratio
+-- ======================================
+
+WITH cte AS (
+    SELECT 
+        r.restaurant_id,
+        r.restaurant_name,
+        TO_CHAR(o.order_date, 'MM-YY') AS month,
+        COUNT(o.order_id) AS current_month_count,
+        LAG(COUNT(o.order_id)) OVER (PARTITION BY r.restaurant_id ORDER BY TO_CHAR(o.order_date, 'MM-YY')) AS prev_month_count
+    FROM resturant r
+    JOIN orders o USING (restaurant_id)
+    JOIN delivery d USING (order_id)
+    WHERE d.delivery_status ILIKE 'delivered'
+    GROUP BY 1, 2, 3
+)
+SELECT *,
+    ROUND((current_month_count::NUMERIC - prev_month_count::NUMERIC) / prev_month_count::NUMERIC, 2) AS growth_ratio
+FROM cte;
+
+-- ======================================
+-- 12. Customer Segmentation (Gold vs Silver)
+-- ======================================
+
+WITH cte AS (
+    SELECT 
+        customer_id,
+        SUM(total_amount) AS total_spent,
+        COUNT(order_id) AS order_count,
+        CASE 
+            WHEN SUM(total_amount) > (SELECT AVG(total_amount) FROM orders) THEN 'Gold'
+            ELSE 'Silver'
+        END AS customer_category
+    FROM orders
+    GROUP BY 1
+)
+SELECT customer_category,
+    SUM(order_count) AS total_orders,
+    SUM(total_spent) AS total_revenue
+FROM cte
+GROUP BY 1;
+
+-- ======================================
+-- 13. Rider Monthly Earnings (8% per delivery)
+-- ======================================
+
+SELECT 
+    r.rider_id,
+    r.rider_name,
+    TO_CHAR(o.order_date, 'MM-YY') AS month,
+    ROUND(SUM(o.total_amount * 0.08)::NUMERIC, 2) AS total_earnings
+FROM orders o
+JOIN delivery d USING (order_id)
+JOIN rider r USING (rider_id)
+GROUP BY 1, 2, 3
+ORDER BY 1, 3;
+
+-- ======================================
+-- 14. Rider Rating Based on Delivery Time
+-- ======================================
+
+WITH cte AS (
+    SELECT 
+        o.order_id,
+        r.rider_id,
+        r.rider_name,
+        ROUND(EXTRACT(EPOCH FROM (d.delivery_time - o.order_time + CASE WHEN d.delivery_time < o.order_time THEN INTERVAL '1 day' ELSE INTERVAL '0 day' END)) / 60, 2) AS time_minutes
+    FROM rider r
+    JOIN delivery d USING (rider_id)
+    JOIN orders o USING (order_id)
+    WHERE d.delivery_status ILIKE 'delivered'
+)
+SELECT rider_id,
+    CASE
+        WHEN time_minutes < 25 THEN '5 Star'
+        WHEN time_minutes BETWEEN 25 AND 40 THEN '4 Star'
+        ELSE '3 Star'
+    END AS rider_rating,
+    COUNT(*)
+FROM cte
+GROUP BY 1, 2
+ORDER BY 1, 2;
+
+-- ======================================
+-- 15. Peak Order Day by Restaurant
+-- ======================================
+
+WITH cte AS (
+    SELECT 
+        r.restaurant_name,
+        TO_CHAR(o.order_date, 'Day') AS day,
+        COUNT(o.order_id) AS total_orders,
+        DENSE_RANK() OVER (PARTITION BY r.restaurant_name ORDER BY COUNT(o.order_id) DESC) AS rank
+    FROM orders o
+    JOIN resturant r USING (restaurant_id)
+    GROUP BY 1, 2
+)
+SELECT restaurant_name, day, total_orders
+FROM cte
+WHERE rank = 1;
+
+-- ======================================
+-- 16. Customer Lifetime Value (CLV)
+-- ======================================
+
+SELECT 
+    c.customer_id,
+    c.customer_name,
+    SUM(o.total_amount) AS CLV
+FROM orders o
+JOIN customer c USING (customer_id)
+GROUP BY 1, 2
+ORDER BY 1;
+
+-- ======================================
+-- 17. Monthly Sales Trends
+-- ======================================
+
+WITH cte AS (
+    SELECT 
+        EXTRACT(YEAR FROM order_date) AS year,
+        EXTRACT(MONTH FROM order_date) AS month,
+        SUM(total_amount) AS current_month,
+        LAG(SUM(total_amount)) OVER (ORDER BY EXTRACT(YEAR FROM order_date), EXTRACT(MONTH FROM order_date)) AS previous_month
+    FROM orders
+    GROUP BY 1, 2
+)
+SELECT *, 
+    ROUND((current_month - previous_month)::NUMERIC / previous_month::NUMERIC * 100, 2) AS growth_rate_percentage
+FROM cte;
+
+-- ======================================
+-- 18. Rider Efficiency
+-- ======================================
+
+WITH cte AS (
+    SELECT 
+        r.rider_id,
+        r.rider_name,
+        ROUND(EXTRACT(EPOCH FROM (d.delivery_time - o.order_time + CASE WHEN d.delivery_time < o.order_time THEN INTERVAL '1 day' ELSE INTERVAL '0 day' END)) / 60, 2) AS time_minutes
+    FROM orders o
+    JOIN delivery d USING (order_id)
+    JOIN rider r USING (rider_id)
+    WHERE d.delivery_status ILIKE 'delivered'
+)
+SELECT MIN(avg_time_minutes), MAX(avg_time_minutes)
+FROM (
+    SELECT rider_id, rider_name, AVG(time_minutes) AS avg_time_minutes
+    FROM cte
+    GROUP BY 1, 2
+) rider_avg_times;
+
+-- ======================================
+-- 19. Top 3 Popular Dishes per Season
+-- ======================================
+
+WITH cte AS (
+    SELECT 
+        o.order_item,
+        CASE 
+            WHEN EXTRACT(MONTH FROM o.order_date) BETWEEN 1 AND 3 THEN 'Spring'
+            WHEN EXTRACT(MONTH FROM o.order_date) BETWEEN 4 AND 6 THEN 'Summer'
+            WHEN EXTRACT(MONTH FROM o.order_date) BETWEEN 7 AND 9 THEN 'Autumn'
+            WHEN EXTRACT(MONTH FROM o.order_date) BETWEEN 10 AND 12 THEN 'Winter'
+        END AS season
+    FROM orders o
+),
+ranked_items AS (
+    SELECT 
+        season,
+        order_item,
+        COUNT(*) AS total_orders,
+        DENSE_RANK() OVER (PARTITION BY season ORDER BY COUNT(*) DESC) AS rank
+    FROM cte
+    GROUP BY 1, 2
+)
+SELECT season, order_item, total_orders
+FROM ranked_items
+WHERE rank <= 3;
+
+-- Q20. City Revenue Ranking
+
+-- Rank each city based on the total revenue for the last year (2023).
 
 
--- Customer Lifetime Value (CLV)
+select r.city,sum(o.total_amount) as total_revenue ,rank() over(order by sum(o.total_amount)) from resturant r join orders o using(restaurant_id)
+where extract(year from o.order_date)=2023
+group by 1
 
--- Calculate the total revenue generated by each customer over all their orders.
-
-select c.customer_id,c.customer_name,sum(o.total_amount) as CLV
-from orders o join customer c using(customer_id)
-group by 1,2 
-order by 1
-
--- Q17. Monthly Sales Trends
--- Question:
--- Identify sales trends by comparing each month's total sales to the previous month.
-
-with cte as (
-select extract(year from order_date) as year ,extract(month from order_date) as month,sum(total_amount) as current_month,lag(sum(total_amount),1) over(order by extract(year from order_date),extract(month from order_date) ) as previous_month from orders
-group by 1,2
-order by 1,2
-) select *,round((current_month-previous_month)::numeric/previous_month::numeric*100,2) as growth_rate_percentage from cte
+-- ======================================
+-- Q20. City Revenue Ranking
+-- ======================================
 
 
--- Rider Efficiency
+SELECT 
+    r.city,
+    SUM(o.total_amount) AS total_revenue,
+    RANK() OVER (ORDER BY SUM(o.total_amount) DESC) AS city_rank
+FROM resturant r
+JOIN orders o USING (restaurant_id)
+WHERE EXTRACT(YEAR FROM o.order_date) = 2023
+GROUP BY r.city
+ORDER BY total_revenue DESC;
 
--- Evaluate rider efficiency by determining average delivery times and identifying those with the
--- lowest and highest averages.
-with cte as (
-select *, round(extract(epoch from (d.delivery_time-o.order_time + case when d.delivery_time < o.order_time then interval '1 day' else interval '0 day' end))/60,2) as time_minutes from orders o join delivery d using(order_id) join rider r using (rider_id)
-where d.delivery_status ilike 'delivered'
-) , rider_time as (select rider_id,rider_name,avg(time_minutes) from cte group by 1,2 order by 1)
-select min(avg),max(avg) from rider_time
